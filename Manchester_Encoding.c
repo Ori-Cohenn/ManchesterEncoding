@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 // Encoding
-char manchesterEncode(const char *data, int dataSize, char *encodedData)
+int manchesterEncode(const char *data, int dataSize, char *encodedData)
 {
     int encodedIndex = 0;
     for (int i = 0; i < dataSize; i++)
@@ -12,8 +12,7 @@ char manchesterEncode(const char *data, int dataSize, char *encodedData)
             encodedData[encodedIndex++] = '0';
             encodedData[encodedIndex++] = '1';
         }
-        else if ((data[i] & 1) == 1)
-        // Low to high transition for 1
+        else if ((data[i] & 1) == 1) // Low to high transition for 1
         {
             encodedData[encodedIndex++] = '1';
             encodedData[encodedIndex++] = '0';
@@ -28,7 +27,7 @@ char manchesterEncode(const char *data, int dataSize, char *encodedData)
 }
 
 // Decoding
-char manchesterDecode(char *encodedData, int dataSize, char *decodedData)
+int manchesterDecode(char *encodedData, int dataSize, char *decodedData)
 {
     int decodedIndex = 0;
     for (int i = 0; i < dataSize; i += 2)
