@@ -39,7 +39,7 @@
             "cStandard": "c11",
             "cppStandard": "c++11",
             "defines": [
-                "__SKETCH_NAME__=\"\"\"adafruit_feather_UART.ino\"\"\"",
+                "__SKETCH_NAME__=\"\"\"adafruit_feather_GPIO.ino\"\"\"",
                 "F_CPU=48000000L",
                 "ARDUINO=10607",
                 "ARDUINO_SAMD_ZERO",

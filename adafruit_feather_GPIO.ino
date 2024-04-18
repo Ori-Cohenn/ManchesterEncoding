@@ -6,7 +6,7 @@
 #define WRITE_PIN A2
 #define READ_PIN A3
 //#define DELAY_TIME 104
-#define DELAY_TIME 500
+#define DELAY_TIME 500000
 #define MAX_DATA_SIZE 40 // 10 bytes
 #define ENCODED_MAX_DATA_SIZE 80 // 10 bytes *2 (manchester encoding)
 #define INTIAL_STATE HIGH
@@ -23,41 +23,47 @@ void writeLoop()
     Serial.println("idle");
     digitalWrite(WRITE_PIN, HIGH);
     //delayMicroseconds(DELAY_TIME);
-    delay(2000);
+    delay(2000); // 1111
     Serial.println("start");
     digitalWrite(WRITE_PIN, LOW);
     // delayMicroseconds(DELAY_TIME);
-    delay(500);
+    delay(500); // 0
     Serial.println("data");
     digitalWrite(WRITE_PIN, HIGH);
     // delayMicroseconds(DELAY_TIME);
-    delay(500);
+    delay(500); // 1
     digitalWrite(WRITE_PIN, LOW);
     // delayMicroseconds(DELAY_TIME);
-    delay(1000);
+    delay(1000); // 00
     digitalWrite(WRITE_PIN, HIGH);
     // delayMicroseconds(DELAY_TIME);
-    delay(500);
+    delay(500); // 1
     digitalWrite(WRITE_PIN, LOW);
     // delayMicroseconds(DELAY_TIME);
-    delay(1000);
+    delay(500); //0
     digitalWrite(WRITE_PIN, HIGH);
     // delayMicroseconds(DELAY_TIME);
-    delay(500);
-    //manchester encoding of 1010
+    delay(500); // 1
+    Serial.println("stop");
+    digitalWrite(WRITE_PIN, HIGH);
+    //delayMicroseconds(DELAY_TIME);
+    delay(2000); // 1111
+    //packet = 1111010010111111-> 100
 }
 
 void readSetup()
 {
-    pinMode(READ_PIN, INPUT_PULLDOWN);
+    pinMode(READ_PIN, INPUT);
     attachInterrupt(digitalPinToInterrupt(READ_PIN), readStart, FALLING);
 }
 
 void readStart() // detect start condition
 {
     detachInterrupt(digitalPinToInterrupt(READ_PIN));
+    delayMicroseconds(100); 
     readData();
     attachInterrupt(digitalPinToInterrupt(READ_PIN), readStart, FALLING);
+    delayMicroseconds(100);
 }
 
 void readData()
@@ -76,27 +82,27 @@ void readData()
     // }
     
     // // Read Manchester encoded data
-
-    unsigned long lastChangeTime = micros();
-    Serial.println(lastChangeTime);
-    while ((index < ENCODED_MAX_DATA_SIZE) && ((micros() - (lastChangeTime < 4 * DELAY_TIME))))
+    unsigned long lastChangeTime = micros(); 
+    while ((index < ENCODED_MAX_DATA_SIZE) && ((micros() - lastChangeTime) < 4 * DELAY_TIME))
     {
         currentState = digitalRead(READ_PIN);
         if (currentState != lastState)
         {  
             receivedData[index++] = currentState == HIGH ? '1' : '0';
+            Serial.println("Received data:");
+            Serial.println(receivedData[index-1]);
             lastChangeTime = micros();
             Serial.println(lastChangeTime);
             lastState = currentState;
         }
     }
-    Serial.println("end"); 
+    Serial.println(receivedData); 
     int isDecoded=manchesterDecode(receivedData, index, decodedData);
     
     if(isDecoded==0)
     {
-        // Serial.println("Decoded data:");
-        // Serial.println(decodedData);
+        Serial.println("Decoded data:");
+        Serial.println(decodedData);
     }
     else
     {

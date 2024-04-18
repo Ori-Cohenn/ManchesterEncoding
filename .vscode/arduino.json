@@ -2,5 +2,5 @@
     "configuration": "opt=small,usbstack=arduino,debug=on",
     "board": "adafruit:samd:adafruit_feather_m0",
     "port": "COM4",
-    "sketch": "adafruit_feather_UART.ino"
+    "sketch": "adafruit_feather_GPIO.ino"
 }
