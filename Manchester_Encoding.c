@@ -1,9 +1,9 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 
 // Encoding
-int manchesterEncode(const uint8_t *data, int dataSize, uint8_t *encodedData)
+int manchesterEncode(uint8_t *data, int dataSize, uint8_t *encodedData)
 {
     int encodedIndex = 0;
     for (int i = 0; i < dataSize; i++)

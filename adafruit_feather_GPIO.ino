@@ -5,30 +5,131 @@
 
 #define WRITE_PIN A2
 #define READ_PIN A3
-//#define DELAY_TIME 104
-#define DELAY_TIME 5000000
-#define MAX_DATA_BYTES 10 // 10 bytes
-#define ENCODED_MAX_DATA_BYTES 80 // 10 bytes *2 (manchester encoding)
+// #define DELAY_TIME 104
+#define DELAY_TIME 500            // 0.5 seconds
+#define MAX_DATA_bits 84          // 10 bytes * 8 bits
+#define ENCODED_MAX_DATA_bits 168 // 10 bytes *2 (manchester encoding)
 #define INTIAL_STATE HIGH
-int mode = 0; // 0 for write, 1 for read
+int mode = 1; // 0 for write com4, 1 for read com9
 // 1/9600= 104.16 microseconds
 
-void writeSetup();
-void writeLoop();
-void readSetup();
-void readStart();
-void readData();
+void readerSetup()
+{
+  pinMode(READ_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(READ_PIN), readStart, FALLING); // detect start bit
+}
+void readStart()
+{
+  noInterrupts();
+  delayMicroseconds(104); // debounce time
+  readData();
+  interrupts();
+}
+void writerSetup()
+{
+  pinMode(WRITE_PIN, OUTPUT);
+}
+void readData()
+{
+  uint8_t dataReceived[ENCODED_MAX_DATA_bits];
+  uint8_t decodedData[MAX_DATA_bits];
+  int i = 0;
+  delay(DELAY_TIME); // wait for the start bit to end
+  Serial.println("\nReading Data: ...");
+  while (!(dataReceived[i - 1] == 1 && dataReceived[i - 2] == 1 && dataReceived[i - 3] == 1 && dataReceived[i - 4] == 1) && i - 1 < ENCODED_MAX_DATA_bits)
+  {
+    dataReceived[i] = digitalRead(READ_PIN);
+    Serial.print("r=");
+    Serial.print(dataReceived[i]);
+    Serial.print("i=");
+    Serial.print(i);
+    delay(DELAY_TIME);
+    i++;
+  }
+  manchesterDecode(dataReceived, (i - 4), decodedData);
+  Serial.print("\nDecoded Data: ");
+  for (int j = 0; j < (i - 4) / 2; j++)
+  {
+    Serial.print(decodedData[j]);
+  }
+  // changing the data from binart representation to hex
+  int hexData[MAX_DATA_bits];
+  Serial.print("\nData in Hex: ");
+  for (int j = 0; j < (i - 4) / 2; j++)
+  {
+    hexData[j] = 0;
+    for (int k = 0; k < 4; k++)
+    {
+      hexData[j] = hexData[j] << 1;
+      hexData[j] = hexData[j] + decodedData[j * 4 + k];
+    }
+    Serial.print(hexData[j], HEX);
+  }
+}
+// write data, start with idle state 11111.... then start bit 0, data, stop bits 1111, idle state 11111...
+void writeData(void)
+{
+  uint8_t dataHex[] = {0x03};
+  uint8_t databits[MAX_DATA_bits];
+  int dataSize = sizeof(dataHex) / sizeof(dataHex[0]);
+  uint8_t encodedData[ENCODED_MAX_DATA_bits];
+  Serial.print("Data in Hex: ");
+  for (int j = 0; j < dataSize; j++)
+  {
+    Serial.print(dataHex[j], HEX);
+  }
+  // changing the data from hex representation to binary
+  Serial.print("\nData in Binary: ");
+  for (int j = 0; j < dataSize; j++)
+  {
+    for (int k = 0; k < 4; k++)
+    {
+      databits[j * 4 + k] = dataHex[j] >> 3 - k & 1;
+      Serial.print(databits[j * 4 + k]);
+    }
+  }
+  manchesterEncode(databits, dataSize * 4, encodedData);
+  Serial.print("\nEncoded Data: ");
+  for (int j = 0; j < dataSize * 8; j++)
+  {
+    Serial.print(encodedData[j]);
+  }
+  Serial.println();
+  // idle state
+  digitalWrite(WRITE_PIN, HIGH);
+  delay(DELAY_TIME * 5); // 11111
+  // start bit
+  digitalWrite(WRITE_PIN, LOW);
+  delay(DELAY_TIME);
+  for (int i = 0; i < dataSize * 8; i++)
+  {
+    if (encodedData[i] == 1)
+    {
+      digitalWrite(WRITE_PIN, HIGH);
+    }
+    else
+    {
+      digitalWrite(WRITE_PIN, LOW);
+    }
+    delay(DELAY_TIME);
+  }
+  // stop bits
+  digitalWrite(WRITE_PIN, HIGH);
+  delay(DELAY_TIME * 4); // 1111
+}
 
 void setup()
 {
   Serial.begin(9600);
+  while (!Serial)
+    ;
   if (mode == 0)
   {
-    writeSetup();
+    writerSetup();
   }
   else if (mode == 1)
   {
-    readSetup();
+    readerSetup();
   }
 }
 
@@ -36,127 +137,11 @@ void loop()
 {
   if (mode == 0)
   {
-    writeLoop();
+    writeData();
+    delay(DELAY_TIME * 5);
   }
   else if (mode == 1)
   {
-  //inerupt will handle the read
+    // inerupt will handle the read
   }
 }
-
-void writeSetup(){
-    pinMode(WRITE_PIN, OUTPUT);
-    digitalWrite(WRITE_PIN, INTIAL_STATE); //intial state is idle
-}
-
-void writeLoop()
-{
-  uint8_t data[MAX_DATA_BYTES] = {0x03,0x01,0x00};// 10 bytes
-  int dataSize = sizeof(data) / sizeof(data[0]);
-  uint8_t datainbits[dataSize*8];
-  Serial.print("\nData:");
-  for(int i=0;i<dataSize;i++)
-  {
-    for(int j=0;j<8;j++)
-    {
-      datainbits[i*8+j]=(data[i]>>j)&1;
-      Serial.print(datainbits[i*8+j]);
-    }
-  }
-  int encodedDataSize=dataSize*8*2;
-  uint8_t encodedData[encodedDataSize];
-  int isEncoded=manchesterEncode(datainbits,encodedDataSize,encodedData);
-  Serial.print("\nEncoded data:");
-  for(int i=0;i<encodedDataSize;i++)
-  {
-    Serial.print(encodedData[i]);
-  }
-  if(isEncoded==0)
-  {
-    // for(int i=0;i<ENCODED_MAX_DATA_BYTES;i++)
-    // {
-    //   digitalWrite(WRITE_PIN,encodedData[i]);
-    //   delayMicroseconds(DELAY_TIME);
-    // }
-  }
-  else
-  {
-    Serial.println("Error: Invalid data.");
-  }
-}
-
-void readSetup()
-{
-    pinMode(READ_PIN, INPUT);
-    attachInterrupt(digitalPinToInterrupt(READ_PIN), readStart, FALLING);
-}
-
-void readStart() // detect start condition
-{
-    detachInterrupt(digitalPinToInterrupt(READ_PIN)); 
-    // wait for start condition to end 
-    while(digitalRead(READ_PIN)==LOW);
-    readData();
-    attachInterrupt(digitalPinToInterrupt(READ_PIN), readStart, FALLING);
-}
-
-void readData()
-{
-    int currentState = digitalRead(READ_PIN); // intial state
-    uint8_t *receivedData = (uint8_t *)calloc(ENCODED_MAX_DATA_BYTES, sizeof(uint8_t));
-    uint8_t *decodedData = (uint8_t *)calloc(ENCODED_MAX_DATA_BYTES/2, sizeof(uint8_t));
-    //memset(decodedData,0,ENCODED_MAX_DATA_BYTES/2);
-    int index = 0;
-    int lastState = currentState;
-    Serial.println("ISR");
-    Serial.println(currentState);
-    // while (currentState == INTIAL_STATE) // while idle
-    // {
-    //     currentState = digitalRead(READ_PIN);
-    // }
-    
-    // // Read Manchester encoded data
-    unsigned long lastChangeTime = micros(); 
-    while (1)
-    {
-        currentState = digitalRead(READ_PIN);
-        if (currentState != lastState)
-        {
-            lastChangeTime = micros();
-            lastState = currentState;
-            if (currentState == HIGH)
-            {
-                receivedData[index++] = 1;
-            }
-            else
-            {
-                receivedData[index++] = 0;
-            }
-        }
-        // stop condition is when the data is 1111 
-        if ((receivedData[index - 4] == 1 && receivedData[index - 3] == 1 && receivedData[index - 2] == 1 && receivedData[index - 1] == 1) || index >= ENCODED_MAX_DATA_BYTES)
-        {
-          // remove the stop condition
-            break;
-        }
-    }
-    Serial.println("Received data:");
-
-    int isDecoded=manchesterDecode(receivedData, index, decodedData);
-    
-    if(isDecoded==0)
-    {
-        Serial.println("Decoded data:");
-        for (int i = 0; i < index / 2; i++)
-        {
-            Serial.print(decodedData[i]);
-        }
-    }
-    else
-    {
-        Serial.println("Error: Invalid Manchester encoding sequence.");
-    }
-    free(receivedData);
-    free(decodedData);
-}
-
