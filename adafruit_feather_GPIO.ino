@@ -82,7 +82,7 @@ void readData()
     Serial.print("\nDecoded Data: ");
     for (int j = 0; j < (bufferIndex - 4) / 2; j++)
     {
-      Serial.print(decodedData[j], DEC);
+      Serial.print(decodedData[j]);
     }
     Serial.print("\nData in Hex: ");
     binaryToHex(decodedData, (bufferIndex - 4) / 2, hexData);
