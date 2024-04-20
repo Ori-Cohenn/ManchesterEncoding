@@ -13,71 +13,97 @@
 int mode = 1; // 0 for write com4, 1 for read com9
 // 1/9600= 104.16 microseconds
 
+volatile int startFlag = 0;
+
+void printHex(uint8_t dataHex[], int dataSize)
+{
+  for (int i = 0; i < dataSize; i++)
+  {
+    Serial.print(dataHex[i], HEX);
+  }
+}
+
+void binaryToHex(uint8_t binaryArr[], int size, char hexArr[])
+{
+  for (int i = 0; i < size; i += 4)
+  {
+    int nibble = 0;
+    for (int j = 0; j < 4; j++)
+    {
+      nibble = (nibble << 1) | binaryArr[i + j];
+    }
+    if (nibble < 10)
+    {
+      hexArr[i / 4] = nibble + '0';
+    }
+    else
+    {
+      hexArr[i / 4] = nibble - 10 + 'A';
+    }
+  }
+  hexArr[size / 4] = '\0'; // Null terminate the string
+}
+
+void readStart()
+{
+  startFlag = 1;
+}
+
 void readerSetup()
 {
   pinMode(READ_PIN, INPUT);
-  attachInterrupt(digitalPinToInterrupt(READ_PIN), readStart, FALLING); // detect start bit
-}
-void readStart()
-{
-  noInterrupts();
-  delayMicroseconds(104); // debounce time
-  readData();
-  interrupts();
+  attachInterrupt(digitalPinToInterrupt(READ_PIN), readStart, FALLING);
 }
 void writerSetup()
 {
   pinMode(WRITE_PIN, OUTPUT);
+  digitalWrite(WRITE_PIN, HIGH);
 }
 void readData()
 {
   uint8_t dataReceived[ENCODED_MAX_DATA_bits];
   uint8_t decodedData[MAX_DATA_bits];
-  int i = 0;
-  delay(DELAY_TIME); // wait for the start bit to end
-  Serial.println("\nReading Data: ...");
-  while (!(dataReceived[i - 1] == 1 && dataReceived[i - 2] == 1 && dataReceived[i - 3] == 1 && dataReceived[i - 4] == 1) && i - 1 < ENCODED_MAX_DATA_bits)
+  int bufferIndex = 0;
+  char hexData[MAX_DATA_bits];
+  int consecutiveOnesCount = 0;
+  delay(DELAY_TIME); // Waiting for start bit to pass
+  Serial.println("\n\nReading Data: ...");
+  while (consecutiveOnesCount < 4 && bufferIndex - 1 < ENCODED_MAX_DATA_bits)
   {
-    dataReceived[i] = digitalRead(READ_PIN);
-    Serial.print("r=");
-    Serial.print(dataReceived[i]);
-    Serial.print("i=");
-    Serial.print(i);
+    dataReceived[bufferIndex] = digitalRead(READ_PIN);
+    consecutiveOnesCount = dataReceived[bufferIndex] == 1 ? consecutiveOnesCount + 1 : 0;
+    Serial.print(dataReceived[bufferIndex]);
     delay(DELAY_TIME);
-    i++;
+    bufferIndex++;
   }
-  manchesterDecode(dataReceived, (i - 4), decodedData);
-  Serial.print("\nDecoded Data: ");
-  for (int j = 0; j < (i - 4) / 2; j++)
+  if (consecutiveOnesCount >= 4)
   {
-    Serial.print(decodedData[j]);
-  }
-  // changing the data from binart representation to hex
-  int hexData[MAX_DATA_bits];
-  Serial.print("\nData in Hex: ");
-  for (int j = 0; j < (i - 4) / 2; j++)
-  {
-    hexData[j] = 0;
-    for (int k = 0; k < 4; k++)
+    manchesterDecode(dataReceived, (bufferIndex - 4), decodedData);
+    Serial.print("\nDecoded Data: ");
+    for (int j = 0; j < (bufferIndex - 4) / 2; j++)
     {
-      hexData[j] = hexData[j] << 1;
-      hexData[j] = hexData[j] + decodedData[j * 4 + k];
+      Serial.print(decodedData[j], DEC);
     }
-    Serial.print(hexData[j], HEX);
+    // changing the data from binary representation to hex
+    Serial.print("\nData in Hex: ");
+    binaryToHex(decodedData, (bufferIndex - 4) / 2, hexData);
+    Serial.print(hexData);
+    memset(dataReceived, 0, sizeof(dataReceived));
+    memset(decodedData, 0, sizeof(decodedData));
+    memset(hexData, 0, sizeof(hexData));
   }
 }
 // write data, start with idle state 11111.... then start bit 0, data, stop bits 1111, idle state 11111...
 void writeData(void)
 {
-  uint8_t dataHex[] = {0x03};
+  // uint8_t dataHex[] = {0xDE,0xED,0xBE,0xEF,0x01,0x90};
+  uint8_t dataHex[] = {0x01, 0x03};
   uint8_t databits[MAX_DATA_bits];
   int dataSize = sizeof(dataHex) / sizeof(dataHex[0]);
   uint8_t encodedData[ENCODED_MAX_DATA_bits];
-  Serial.print("Data in Hex: ");
-  for (int j = 0; j < dataSize; j++)
-  {
-    Serial.print(dataHex[j], HEX);
-  }
+  Serial.print("\nData in Hex: ");
+  // Move to function
+  printHex(dataHex, dataSize);
   // changing the data from hex representation to binary
   Serial.print("\nData in Binary: ");
   for (int j = 0; j < dataSize; j++)
@@ -97,7 +123,7 @@ void writeData(void)
   Serial.println();
   // idle state
   digitalWrite(WRITE_PIN, HIGH);
-  delay(DELAY_TIME * 5); // 11111
+  delay(DELAY_TIME * 6); // 111111
   // start bit
   digitalWrite(WRITE_PIN, LOW);
   delay(DELAY_TIME);
@@ -137,11 +163,19 @@ void loop()
 {
   if (mode == 0)
   {
-    writeData();
-    delay(DELAY_TIME * 5);
+    while (!Serial.available())
+      ;
+    if (Serial.read() == 'w')
+      writeData();
   }
   else if (mode == 1)
   {
-    // inerupt will handle the read
+    if (startFlag == 1)
+    {
+      detachInterrupt(digitalPinToInterrupt(READ_PIN));
+      startFlag = 0;
+      readData();
+      attachInterrupt(digitalPinToInterrupt(READ_PIN), readStart, FALLING);
+    }
   }
 }
