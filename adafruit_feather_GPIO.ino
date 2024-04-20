@@ -10,7 +10,7 @@
 #define MAX_DATA_bits 84          // 10 bytes * 8 bits
 #define ENCODED_MAX_DATA_bits 168 // 10 bytes *2 (manchester encoding)
 #define INTIAL_STATE HIGH
-int mode = 1; // 0 for write com4, 1 for read com9
+int mode = 1; 
 // 1/9600= 104.16 microseconds
 
 volatile int startFlag = 0;
@@ -41,7 +41,7 @@ void binaryToHex(uint8_t binaryArr[], int size, char hexArr[])
       hexArr[i / 4] = nibble - 10 + 'A';
     }
   }
-  hexArr[size / 4] = '\0'; // Null terminate the string
+  hexArr[size / 4] = '\0'; 
 }
 
 void readStart()
@@ -84,7 +84,6 @@ void readData()
     {
       Serial.print(decodedData[j], DEC);
     }
-    // changing the data from binary representation to hex
     Serial.print("\nData in Hex: ");
     binaryToHex(decodedData, (bufferIndex - 4) / 2, hexData);
     Serial.print(hexData);
@@ -93,18 +92,15 @@ void readData()
     memset(hexData, 0, sizeof(hexData));
   }
 }
-// write data, start with idle state 11111.... then start bit 0, data, stop bits 1111, idle state 11111...
 void writeData(void)
 {
-  // uint8_t dataHex[] = {0xDE,0xED,0xBE,0xEF,0x01,0x90};
+  //uint8_t dataHex[] = {0xDE, 0xED, 0xBE, 0xEF, 0x01, 0x90};
   uint8_t dataHex[] = {0x01, 0x03};
   uint8_t databits[MAX_DATA_bits];
   int dataSize = sizeof(dataHex) / sizeof(dataHex[0]);
   uint8_t encodedData[ENCODED_MAX_DATA_bits];
   Serial.print("\nData in Hex: ");
-  // Move to function
   printHex(dataHex, dataSize);
-  // changing the data from hex representation to binary
   Serial.print("\nData in Binary: ");
   for (int j = 0; j < dataSize; j++)
   {
@@ -121,10 +117,8 @@ void writeData(void)
     Serial.print(encodedData[j]);
   }
   Serial.println();
-  // idle state
   digitalWrite(WRITE_PIN, HIGH);
-  delay(DELAY_TIME * 6); // 111111
-  // start bit
+  delay(DELAY_TIME * 6); 
   digitalWrite(WRITE_PIN, LOW);
   delay(DELAY_TIME);
   for (int i = 0; i < dataSize * 8; i++)
@@ -139,9 +133,8 @@ void writeData(void)
     }
     delay(DELAY_TIME);
   }
-  // stop bits
   digitalWrite(WRITE_PIN, HIGH);
-  delay(DELAY_TIME * 4); // 1111
+  delay(DELAY_TIME * 4); 
 }
 
 void setup()
