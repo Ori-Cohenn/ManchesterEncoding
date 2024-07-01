@@ -1,4 +1,3 @@
-Manchester Encoding with Adafruit Feather M0 LoRa
 This project demonstrates Manchester Encoding using two Adafruit Feather M0 LoRa microcontroller units (MCUs). The data flows over the GPIO lines, establishing a master and slave relationship.
 
 Table of Contents
